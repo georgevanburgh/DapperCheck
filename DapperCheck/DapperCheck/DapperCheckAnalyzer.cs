@@ -74,7 +74,7 @@ namespace DapperCheck
             if ((argumentList?.Arguments.Count ?? 0) < 1) return;
 
             // Get the compile-time value of the sql argument
-            var sqlLiteral = argumentList?.Arguments[0].Expression as IdentifierNameSyntax;
+            var sqlLiteral = argumentList?.Arguments[0].Expression;
             if (sqlLiteral == null) return;
             var sqlOpt = context.SemanticModel.GetConstantValue(sqlLiteral);
             if (!sqlOpt.HasValue) return; // Couldn't resolve the compile-time value
