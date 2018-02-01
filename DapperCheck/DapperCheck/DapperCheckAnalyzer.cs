@@ -52,10 +52,17 @@ namespace DapperCheck
 
 
         // TODO: Use a proper SQL parser
-        private static List<string> GetColumnNamesFromSql(string givenSql)
+        private static List<string> TryGetColumnNamesFromSql(string givenSql)
         {
-            var selectClause = givenSql.Split(new string[] { "FROM" }, StringSplitOptions.RemoveEmptyEntries).First().Substring(7);
-            return selectClause.Split(',').Select(s => s.Trim()).Select(NormaliseColumnName).ToList();
+            try
+            {
+                var selectClause = givenSql.Split(new string[] {"FROM"}, StringSplitOptions.RemoveEmptyEntries).First().Substring(7);
+                return selectClause.Split(',').Select(s => s.Trim()).Select(NormaliseColumnName).ToList();
+            }
+            catch (Exception e)
+            {
+                return null;
+            }
         }
 
         private static void AnalyzeDapperCall(SyntaxNodeAnalysisContext context)
@@ -87,16 +94,20 @@ namespace DapperCheck
             if (deserializationTargetTypeSymbols.Length != 1) return; // TODO: Support nested types??
             var deserializationTargetTypeSymbol = deserializationTargetTypeSymbols.First() as INamedTypeSymbol;
             if (deserializationTargetTypeSymbol == null) return; // TODO: Needed?
+            if (deserializationTargetTypeSymbol.Kind == SymbolKind.ErrorType) return;
+            if (deserializationTargetTypeSymbol.ContainingNamespace.Name == "System") return; // TODO: Support system types?
 
             // Get the public parameters
             // TODO: Need to check base class?
             var deserializationTargetMemberNames = deserializationTargetTypeSymbol.MemberNames;
 
-            // Get the column names from SQL
-            var columns = GetColumnNamesFromSql(sql);
+            // Try and get the column names from SQL
+            var parsedColumnNames = TryGetColumnNamesFromSql(sql);
+
+            if (parsedColumnNames == null || parsedColumnNames.Count == 0) return;
 
             // Compare the two collections
-            var missingColumns = columns.Where(c => !deserializationTargetMemberNames.Contains(c));
+            var missingColumns = parsedColumnNames.Where(c => !deserializationTargetMemberNames.Contains(c));
             foreach (var column in missingColumns)
             {
                 // Raise alerts for missing column names
